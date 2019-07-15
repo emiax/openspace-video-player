@@ -3,10 +3,16 @@ import './App.css';
 
 import openspaceApi from 'openspace-api-js';
 
-// Apollo 11 Landing from:
+// Apollo 11 Landing:
 // https://www.youtube.com/watch?v=RONIax0_1ec
-// This file is not in the repository.
-const videos = {
+
+// Apollo 8 earthrise moment:
+// https://www.youtube.com/watch?time_continue=269&v=dE-vOscpiNc
+
+// These files are not in the repository.
+
+const media = {
+  "1968-12-24T16:37:27": "earthrise.wav",
   "1969-07-20T20:03:23": "apollo11-landing.webm"
 };
 
@@ -22,18 +28,17 @@ function listenToTime(api, cb) {
   })();
 }
 
-
-const secondsOffTolerance = 1;
+const secondsOffTolerancePlaying = 1;
+const secondsOffTolerancePaused = 1/20;
 
 class App extends Component {
   constructor() {
     super();
     this.update = this.update.bind(this);
-
-    this.videoRef = React.createRef();
+    this.mediaRef = React.createRef();
 
     this.state = {
-      videoSource: undefined
+      mediaSource: undefined
     }
 
     const api = openspaceApi();
@@ -56,52 +61,140 @@ class App extends Component {
     if (data.time) {
       const time = data.time;
       const simulationTime = new Date(time);
-      let msInVideo = Infinity;
-      let foundVideo = undefined;
+      let msInClip = Infinity;
+      let foundMedia = undefined;
 
-      Object.keys(videos).forEach((startTime) => {
+      Object.keys(media).forEach((startTime) => {
         const diff = simulationTime.getTime() - (new Date(startTime)).getTime();
-        if (diff > 0 && diff < msInVideo) {
-          msInVideo = diff;
-          foundVideo = videos[startTime];
+        if (diff > 0 && diff < msInClip) {
+          msInClip = diff;
+          foundMedia = media[startTime];
         }
       });
 
-      if (foundVideo) {
+      if (foundMedia) {
         this.setState({
-          videoSource: foundVideo,
-          targetTime: msInVideo / 1000
+          mediaSource: foundMedia,
+          targetTime: msInClip / 1000
         });
+      } else {
+        this.setState({
+          mediaSource: null,
+          targetTime: 0
+        })
+      }
+    }
+  }
+
+  async setPlaybackRate(time, rate) {
+    const element = this.mediaRef.current;
+
+    if (!element) {
+      return;
+    }
+
+    if (time > element.duration) {
+      await element.pause();
+      element.currentTime = 0;
+      element.style.opacity = 0;
+      return;
+    } else {
+      element.style.opacity = 1;
+    }
+
+    // First, let's make sure the currentTime is within tolerances.
+    // Use different tolerances depending on paused or playing state.
+    const diff = Math.abs(time - element.currentTime);
+    if (rate === 0) {
+      if (diff > secondsOffTolerancePaused) {
+        console.log('jump while paused. Diff is: ' + diff + 's');
+        element.currentTime = time;
+      }
+    } else {
+      if (diff > secondsOffTolerancePlaying) {
+        console.log('jump while playing. Diff is: ' + diff + 's');
+        element.currentTime = time;
+      }
+    }
+
+    // Second, let's play the video at the same speed as OpenSpace's simulation speed.
+    // This may fail due to browser playback rate limitations,
+    // so in that case we fall back to setting the time and pausing.
+    try {
+      if (rate === 0) {
+        // Simulation is paused:
+        if (element.playbackRate !== 1) {
+          element.playbackRate = 1;
+        }
+        if (!element.paused) {
+          console.log('pausing')
+          await element.pause();
+        }
+      } else {
+        // Simulation is playing:
+        if (element.playbackRate !== rate) {
+          element.playbackRate = rate;
+        }
+        if (element.paused) {
+          console.log('playing')
+          await element.play();
+        }
+      }
+    } catch (e) {
+      // Fallback on setting time and pausing:
+      if (element.currentTime !== time) {
+        element.currentTime = time;
+        console.log('jump (not keeping up)');
+      }
+      if (element.playbackRate !== 1) {
+        console.log('playback rate fallback (not keeping up)')
+        element.playbackRate = 1;
+      }
+      if (!element.paused) {
+        console.log('pausing (not keeping up)')
+        await element.pause();
       }
     }
   }
 
   render() {
-    const video = this.videoRef.current;
-    if (video) {
-
-      const playbackRate = this.state.isPaused ? 0 : this.state.targetDeltaTime;
-
-      if (this.state.videoSource &&
-          (playbackRate === 0 ||
-           Math.abs(this.state.targetTime - video.currentTime) > secondsOffTolerance))
-      {        
-        video.currentTime = this.state.targetTime;  
-      }
-
-      try {
-        video.playbackRate = playbackRate;
-        video.play();
-      } catch (e) {
-        video.playbackRate = 0;
-        video.pause();
-      }
+    const source = this.state.mediaSource;
+    if (!source) {
+      return null;
     }
 
+    const playbackRate = this.state.isPaused ? 0 : this.state.targetDeltaTime;
+    const targetTime = this.state.targetTime;
+
+    const filename = source.split('.');
+    const extension = filename[1] || '';
+
+    let mimeType = undefined;
+    let MediaType = undefined;
+
+    switch (extension) {
+      case 'webm':
+        MediaType = 'video';
+        mimeType = 'video/webm'
+      break;
+      case 'wav':
+        MediaType = 'audio';
+        mimeType = 'audio/wav'
+      break;
+      default:
+        return null;
+    }
+
+    if (!mimeType || !MediaType) {
+      return null;
+    }
+
+    setTimeout(() => this.setPlaybackRate(targetTime, playbackRate), 0);
+
     return (
-      <video ref={this.videoRef}>
-        {this.state.videoSource && <source src={this.state.videoSource} type="video/webm"/>}
-      </video>
+      <MediaType className="fullscreen" ref={this.mediaRef}>
+        {<source src={this.state.mediaSource} type={mimeType}/>}
+      </MediaType>
     );
   }
 }
