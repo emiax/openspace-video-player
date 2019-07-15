@@ -3,18 +3,20 @@ import './App.css';
 
 import openspaceApi from 'openspace-api-js';
 
-// Apollo 11 Landing:
-// https://www.youtube.com/watch?v=RONIax0_1ec
+let media = {};
+let error = undefined;
 
-// Apollo 8 earthrise moment:
-// https://www.youtube.com/watch?time_continue=269&v=dE-vOscpiNc
-
-// These files are not in the repository.
-
-const media = {
-  "1968-12-24T16:37:27": "earthrise.wav",
-  "1969-07-20T20:03:23": "apollo11-landing.webm"
-};
+try {
+  const urlParams = new URLSearchParams(window.location.search);
+  const mediaString = urlParams.get('media');
+  if (!mediaString) {
+    throw 'Missing media.';
+  }
+  const media = JSON.parse(mediaString);
+  console.log(media);
+} catch(e) {
+  error = e;
+}
 
 function listenToTime(api, cb) {
   const timeTopic = api.startTopic('time', {
@@ -158,6 +160,15 @@ class App extends Component {
   }
 
   render() {
+    if (error) {
+      const usageExample = '?media={"1968-12-24T16:37:27":"earthrise.wav","1969-07-20T20:03:23":"apollo11-landing.webm"}';
+      console.error(error);
+      return <div>
+        <p>Error: {error.toString()}</p>
+        <p>Usage: Specify the media files to use as a query parameter. Example: {usageExample}</p>
+      </div>;
+    }
+
     const source = this.state.mediaSource;
     if (!source) {
       return null;
