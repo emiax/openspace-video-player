@@ -39,7 +39,7 @@ class App extends Component {
 
     this.state = {
       mediaSource: undefined
-    }
+    };
 
     const api = openspaceApi();
     api.onConnect(() => listenToTime(api, this.update));
@@ -50,12 +50,12 @@ class App extends Component {
     if (data.targetDeltaTime) {
       this.setState({
         targetDeltaTime: data.targetDeltaTime
-      })
+      });
     }
     if (data.isPaused !== undefined) {
       this.setState({
         isPaused: data.isPaused
-      })
+      });
     }
 
     if (data.time) {
@@ -86,7 +86,7 @@ class App extends Component {
     }
   }
 
-  async setPlaybackRate(time, rate) {
+  async setPlaybackState(time, rate) {
     const element = this.mediaRef.current;
 
     if (!element) {
@@ -107,12 +107,12 @@ class App extends Component {
     const diff = Math.abs(time - element.currentTime);
     if (rate === 0) {
       if (diff > secondsOffTolerancePaused) {
-        console.log('jump while paused. Diff is: ' + diff + 's');
+        console.log('jump while paused. Diff was: ' + diff + 's');
         element.currentTime = time;
       }
     } else {
       if (diff > secondsOffTolerancePlaying) {
-        console.log('jump while playing. Diff is: ' + diff + 's');
+        console.log('jump while playing. Diff was: ' + diff + 's');
         element.currentTime = time;
       }
     }
@@ -127,7 +127,7 @@ class App extends Component {
           element.playbackRate = 1;
         }
         if (!element.paused) {
-          console.log('pausing')
+          console.log('pausing');
           await element.pause();
         }
       } else {
@@ -136,7 +136,7 @@ class App extends Component {
           element.playbackRate = rate;
         }
         if (element.paused) {
-          console.log('playing')
+          console.log('playing');
           await element.play();
         }
       }
@@ -147,11 +147,11 @@ class App extends Component {
         console.log('jump (not keeping up)');
       }
       if (element.playbackRate !== 1) {
-        console.log('playback rate fallback (not keeping up)')
+        console.log('playback rate fallback (not keeping up)');
         element.playbackRate = 1;
       }
       if (!element.paused) {
-        console.log('pausing (not keeping up)')
+        console.log('pausing (not keeping up)');
         await element.pause();
       }
     }
@@ -175,11 +175,11 @@ class App extends Component {
     switch (extension) {
       case 'webm':
         MediaType = 'video';
-        mimeType = 'video/webm'
+        mimeType = 'video/webm';
       break;
       case 'wav':
         MediaType = 'audio';
-        mimeType = 'audio/wav'
+        mimeType = 'audio/wav';
       break;
       default:
         return null;
@@ -189,7 +189,7 @@ class App extends Component {
       return null;
     }
 
-    setTimeout(() => this.setPlaybackRate(targetTime, playbackRate), 0);
+    setTimeout(() => this.setPlaybackState(targetTime, playbackRate), 0);
 
     return (
       <MediaType className="fullscreen" ref={this.mediaRef}>
