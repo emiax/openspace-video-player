@@ -3,21 +3,6 @@ import './App.css';
 
 import openspaceApi from 'openspace-api-js';
 
-let media = {};
-let error = undefined;
-
-try {
-  const urlParams = new URLSearchParams(window.location.search);
-  const mediaString = urlParams.get('media');
-  if (!mediaString) {
-    throw 'Missing media.';
-  }
-  const media = JSON.parse(mediaString);
-  console.log(media);
-} catch(e) {
-  error = e;
-}
-
 function listenToTime(api, cb) {
   const timeTopic = api.startTopic('time', {
     event: 'start_subscription',
@@ -36,6 +21,9 @@ const secondsOffTolerancePaused = 1/20;
 class App extends Component {
   constructor() {
     super();
+
+    this.media = {};
+
     this.update = this.update.bind(this);
     this.mediaRef = React.createRef();
 
@@ -43,8 +31,36 @@ class App extends Component {
       mediaSource: undefined
     };
 
-    const api = openspaceApi();
-    api.onConnect(() => listenToTime(api, this.update));
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const mediaString = urlParams.get('media');
+      if (!mediaString) {
+        throw new Error('Missing media.');
+      }
+      this.media = JSON.parse(mediaString);
+    } catch(e) {
+      this.state.error = e;
+    }
+
+    const env = window.OpenSpaceEnvironment || {};
+    const wsAddress = env.wsAddress;
+    const wsPort = env.wsPort;
+    if (wsAddress) {
+      console.log('Connecting to ' + wsAddress);
+    } else {
+      console.log('Connecting to default address.')
+    }
+    if (wsPort) {
+      console.log('Using port ' + wsPort);
+    } else {
+      console.log('Using default port.');
+    }
+
+    const api = openspaceApi(wsAddress, wsPort);
+    api.onConnect(() => {
+      console.log('Connected to OpenSpace.')
+      listenToTime(api, this.update)
+    });
     api.connect();
   }
 
@@ -66,11 +82,11 @@ class App extends Component {
       let msInClip = Infinity;
       let foundMedia = undefined;
 
-      Object.keys(media).forEach((startTime) => {
+      Object.keys(this.media).forEach((startTime) => {
         const diff = simulationTime.getTime() - (new Date(startTime)).getTime();
         if (diff > 0 && diff < msInClip) {
           msInClip = diff;
-          foundMedia = media[startTime];
+          foundMedia = this.media[startTime];
         }
       });
 
@@ -160,11 +176,10 @@ class App extends Component {
   }
 
   render() {
-    if (error) {
+    if (this.state.error) {
       const usageExample = '?media={"1968-12-24T16:37:27":"earthrise.wav","1969-07-20T20:03:23":"apollo11-landing.webm"}';
-      console.error(error);
       return <div>
-        <p>Error: {error.toString()}</p>
+        <p>{this.state.error.toString()}</p>
         <p>Usage: Specify the media files to use as a query parameter. Example: {usageExample}</p>
       </div>;
     }
@@ -203,8 +218,8 @@ class App extends Component {
     setTimeout(() => this.setPlaybackState(targetTime, playbackRate), 0);
 
     return (
-      <MediaType className="fullscreen" ref={this.mediaRef}>
-        {<source src={this.state.mediaSource} type={mimeType}/>}
+      <MediaType key={this.state.mediaSource} className="fullscreen" ref={this.mediaRef}>
+        {<source key={this.state.mediaSource} src={this.state.mediaSource} type={mimeType}/>}
       </MediaType>
     );
   }
